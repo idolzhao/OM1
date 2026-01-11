@@ -110,10 +110,27 @@ class SelfieConnector(ActionConnector[SelfieConfig, SelfieInput]):
         """
         url = f"{self.base_url}{path}"
         try:
-            r = requests.post(url, json=body, timeout=self.http_timeout)
-            return r.json()
+            r = requests.post(url, json=body, timeout=self.http_timeout, verify=True)
+            r.raise_for_status()  # Raise exception for HTTP errors
+            response_data = r.json()
+            if response_data is None:
+                logging.warning("HTTP POST %s returned None", url)
+                return None
+            return response_data
+        except requests.exceptions.Timeout as e:
+            logging.warning("HTTP POST %s timeout (%s) body=%s", url, e, body)
+            return None
+        except requests.exceptions.HTTPError as e:
+            logging.warning("HTTP POST %s HTTP error (%s) body=%s", url, e, body)
+            return None
+        except requests.exceptions.RequestException as e:
+            logging.warning("HTTP POST %s request failed (%s) body=%s", url, e, body)
+            return None
+        except ValueError as e:
+            logging.warning("HTTP POST %s JSON decode error (%s) body=%s", url, e, body)
+            return None
         except Exception as e:
-            logging.warning("HTTP POST %s failed (%s) body=%s", url, e, body)
+            logging.warning("HTTP POST %s unexpected error (%s) body=%s", url, e, body)
             return None
 
     def _get_config(self) -> Dict:

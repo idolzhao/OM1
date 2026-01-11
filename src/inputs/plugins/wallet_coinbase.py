@@ -52,11 +52,16 @@ class WalletCoinbase(FuserInput[WalletCoinbaseConfig, List[float]]):
         API_KEY = os.environ.get("COINBASE_API_KEY")
         API_SECRET = os.environ.get("COINBASE_API_SECRET")
         if not API_KEY or not API_SECRET:
-            logging.error(
-                "COINBASE_API_KEY or COINBASE_API_SECRET environment variable is not set"
-            )
-        else:
-            Cdp.configure(API_KEY, API_SECRET)
+            missing = []
+            if not API_KEY:
+                missing.append("COINBASE_API_KEY")
+            if not API_SECRET:
+                missing.append("COINBASE_API_SECRET")
+            error_msg = f"Missing required environment variables: {', '.join(missing)}"
+            logging.error(error_msg)
+            raise ValueError(error_msg)
+
+        Cdp.configure(API_KEY, API_SECRET)
 
         try:
             # fetch wallet data

@@ -55,6 +55,7 @@ class GovernanceEthereum(FuserInput[SensorConfig, Optional[str]]):
                 json=payload,
                 headers={"Content-Type": "application/json"},
                 timeout=10,
+                verify=True,  # Explicitly enable SSL verification
             )
             logging.debug(f"Blockchain response status: {response.status_code}")
 
@@ -66,6 +67,9 @@ class GovernanceEthereum(FuserInput[SensorConfig, Optional[str]]):
 
                     # Decode the response using Web3.py
                     decoded_data = self.decode_eth_response(hex_response)
+                    if decoded_data is None:
+                        logging.error("Error: Failed to decode blockchain data")
+                        return None
                     logging.debug(f"Decoded blockchain data: {decoded_data}")
                     return decoded_data
                 else:
@@ -75,8 +79,12 @@ class GovernanceEthereum(FuserInput[SensorConfig, Optional[str]]):
                     f"Error: Blockchain request failed with status {response.status_code}"
                 )
 
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Network error loading rules from blockchain: {e}")
+        except ValueError as e:
+            logging.error(f"Invalid JSON response from blockchain: {e}")
         except Exception as e:
-            logging.error(f"Error loading rules from blockchain: {e}")
+            logging.error(f"Unexpected error loading rules from blockchain: {e}")
 
         return None
 
@@ -86,27 +94,54 @@ class GovernanceEthereum(FuserInput[SensorConfig, Optional[str]]):
         Extracts and decodes a UTF-8 string from ABI-encoded data.
         Cleans any unwanted control characters.
         """
+        if not hex_response or not isinstance(hex_response, str):
+            logging.error("Invalid hex_response: must be a non-empty string")
+            return None
+
         if hex_response.startswith("0x"):
             hex_response = hex_response[2:]
 
         try:
             response_bytes = bytes.fromhex(hex_response)
 
+            # Validate minimum length
+            if len(response_bytes) < 128:
+                logging.error(f"Response too short: {len(response_bytes)} bytes, expected at least 128")
+                return None
+
             # Read offsets and string length
             # offset = int.from_bytes(response_bytes[:32], "big")
             string_length = int.from_bytes(response_bytes[96:128], "big")
 
+            # Validate string length to prevent potential attacks
+            max_allowed_length = 10000  # 10KB limit
+            if string_length > max_allowed_length:
+                logging.error(f"String length {string_length} exceeds maximum allowed {max_allowed_length}")
+                return None
+
+            # Validate we have enough bytes
+            if len(response_bytes) < 128 + string_length:
+                logging.error(f"Insufficient data: need {128 + string_length} bytes, got {len(response_bytes)}")
+                return None
+
             # Extract and decode string
             string_bytes = response_bytes[128 : 128 + string_length]
-            decoded_string = string_bytes.decode("utf-8")
+            decoded_string = string_bytes.decode("utf-8", errors="strict")
 
             # Remove unexpected control characters (like \x19)
-            cleaned_string = "".join(ch for ch in decoded_string if ch.isprintable())
+            # Only allow printable ASCII and common whitespace
+            cleaned_string = "".join(ch for ch in decoded_string if ch.isprintable() or ch in ['\n', '\t', ' '])
 
             return cleaned_string
 
+        except ValueError as e:
+            logging.error(f"Invalid hex string: {e}")
+            return None
+        except UnicodeDecodeError as e:
+            logging.error(f"UTF-8 decoding error: {e}")
+            return None
         except Exception as e:
-            logging.error(f"Decoding error: {e}")
+            logging.error(f"Unexpected decoding error: {e}")
             return None
 
     def __init__(self, config: SensorConfig):

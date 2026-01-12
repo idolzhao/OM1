@@ -130,9 +130,10 @@ class FunctionGenerator:
             if docstring and param_name in docstring:
                 param_schema["description"] = f"Parameter {param_name}"
 
-            required.append(param_name)
-
-            if param.default != inspect.Parameter.empty:
+            # Only add to required if parameter has no default value
+            if param.default == inspect.Parameter.empty:
+                required.append(param_name)
+            else:
                 desc = param_schema.get("description", f"Parameter {param_name}")
                 if "(optional)" not in desc and "(optional" not in desc:
                     param_schema["description"] = (

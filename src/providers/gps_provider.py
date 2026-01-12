@@ -121,8 +121,15 @@ class GpsProvider:
                     alt = parts[4].split(":")[1]
                     sat = parts[5].split(":")[1]
                     time = parts[6][5:]
-                    # turn 25 into full year -> 2025, for example
-                    self.gps_unix_ts = self.string_to_unix_timestamp("20" + time)
+                    # Handle year format - prepend century if only 2 digits
+                    # Assumes years 00-99 are in 2000s (will work until 2099)
+                    if len(time) >= 2 and time[:2].isdigit():
+                        year_str = time[:2]
+                        year_int = int(year_str)
+                        # Use 20xx for years 00-99
+                        full_year = f"20{year_str}" if year_int < 100 else year_str
+                        time = full_year + time[2:]
+                    self.gps_unix_ts = self.string_to_unix_timestamp(time)
 
                     qua = 0
                     if len(parts) > 7:

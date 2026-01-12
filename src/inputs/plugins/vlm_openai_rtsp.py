@@ -216,3 +216,16 @@ INPUT: {self.descriptor_for_LLM}
         self.messages = []
 
         return result
+
+    def stop(self):
+        """
+        Stop the VLM input handler and cleanup resources.
+
+        Stops the VLM provider to release camera and API connections.
+        """
+        if hasattr(self, 'vlm') and self.vlm is not None:
+            try:
+                self.vlm.stop()
+                logging.info("VLM OpenAI RTSP provider stopped")
+            except Exception as e:
+                logging.error(f"Error stopping VLM provider: {e}")

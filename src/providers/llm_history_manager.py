@@ -246,8 +246,12 @@ class LLMHistoryManager:
                         logging.error(
                             f"Summarization failed: {summary_message.content}"
                         )
-                        messages.pop(0) if messages else None
-                        messages.pop(0) if messages else None
+                        # Safely remove up to 2 messages if they exist
+                        if len(messages) >= 2:
+                            messages.pop(0)
+                            messages.pop(0)
+                        elif len(messages) == 1:
+                            messages.pop(0)
                     else:
                         logging.warning(f"Unexpected summary result: {summary_message}")
                 except asyncio.CancelledError:
@@ -256,8 +260,12 @@ class LLMHistoryManager:
                     logging.error(
                         f"Error in summary task callback: {type(e).__name__}: {e}"
                     )
-                    messages.pop(0) if messages else None
-                    messages.pop(0) if messages else None
+                    # Safely remove up to 2 messages if they exist
+                    if len(messages) >= 2:
+                        messages.pop(0)
+                        messages.pop(0)
+                    elif len(messages) == 1:
+                        messages.pop(0)
 
             self._summary_task.add_done_callback(callback)
 
@@ -265,8 +273,12 @@ class LLMHistoryManager:
             logging.warning("Summary task creation cancelled")
         except Exception as e:
             logging.error(f"Error starting summary task: {type(e).__name__}: {e}")
-            messages.pop(0) if messages else None
-            messages.pop(0) if messages else None
+            # Safely remove up to 2 messages if they exist
+            if len(messages) >= 2:
+                messages.pop(0)
+                messages.pop(0)
+            elif len(messages) == 1:
+                messages.pop(0)
 
     def get_messages(self) -> List[dict]:
         """
